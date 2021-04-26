@@ -2,6 +2,7 @@
 
 #include "LCD.h"
 #include <math.h>
+#include <stdlib.h>
 #include "printf.h"
 #include <stdarg.h>
 
@@ -279,6 +280,81 @@ void LCD_Image_mono(tImage img, uint16_t x, uint16_t y)
         }
     }
     while (SPI1_BSY);
+}
+
+void LCD_set_pixel(uint16_t x, uint16_t y, uint16_t color)
+{
+    LCD_SetWindow(x, y, 1, 1);
+    LCD_DC_UP;
+    LCD_SendPixel(color);
+    while (SPI1_BSY);
+}
+
+void LCD_draw_circle(int16_t x0, int16_t y0, int16_t radius)
+{
+    int x = 0;
+    int y = radius;
+    int delta = 1 - 2 * radius;
+    int error = 0;
+
+    while (y >= 0) {
+        LCD_draw_line(x0 + x, y0 - y, x0 + x, y0 + y, 1);
+        LCD_draw_line(x0 - x, y0 - y, x0 - x, y0 + y, 1);
+        error = 2 * (delta + y) - 1;
+
+        if (delta < 0 && error <= 0) {
+            ++x;
+            delta += 2 * x + 1;
+            continue;
+        }
+
+        error = 2 * (delta - x) - 1;
+
+        if (delta > 0 && error > 0) {
+            --y;
+            delta += 1 - 2 * y;
+            continue;
+        }
+
+        ++x;
+        delta += 2 * (x - y);
+        --y;
+    }
+}
+
+void LCD_draw_line(int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint8_t thick)
+{
+    const int16_t deltaX = abs(x2 - x1);
+    const int16_t deltaY = abs(y2 - y1);
+    const int16_t signX = x1 < x2 ? 1 : -1;
+    const int16_t signY = y1 < y2 ? 1 : -1;
+
+    int16_t error = deltaX - deltaY;
+
+    if (thick > 1)
+        LCD_draw_circle(x2, y2, thick >> 1);
+    else
+        LCD_set_pixel(x2, y2, TextColor);
+
+    while (x1 != x2 || y1 != y2)
+    {
+        if (thick > 1)
+            LCD_draw_circle(x1, y1, thick >> 1);
+        else
+            LCD_set_pixel(x1, y1, TextColor);
+
+        const int16_t error2 = error * 2;
+        if (error2 > -deltaY)
+        {
+            error -= deltaY;
+            x1 += signX;
+        }
+        if (error2 < deltaX)
+        {
+            error += deltaX;
+            y1 += signY;
+        }
+    }
 }
 
 void LCD_print(char * str)

@@ -4,7 +4,8 @@
 
 #include <math.h>
 
-void Clock_Init(void);
+void screen_main_draw(void);
+void screen_main_update(void);
 
 void draw_capacity(uint16_t cap);
 void draw_power(int16_t pow);
@@ -12,36 +13,151 @@ void draw_speed(uint16_t spd);
 
 int main(void)
 {
-	Clock_Init();
-	LCD_init();
-	RTC_Init();
-	//time_last = RTC_Get_timestamp();
+    Clock_Init();
+    LCD_init();
+    RTC_Init();
 
-    uint16_t cap = 0;
-    uint16_t spd = 0;
-    int16_t pow = -300;
+    LCD_SetBGColor(BLACK);
+    LCD_SetTextColor(RED);
+    screen_main_draw();
 
-	while (1)
-	{
-        LL_mDelay(10);
-
-        draw_capacity(cap+=10);
-        if (cap > 8000)
-            cap = 0;
-        draw_power(pow++);
-        if (pow > 1000)
-            pow = -300;
-        //draw_speed(299);
-        draw_speed(spd++);
-        if (spd > 300)
-            spd = 0;
-	}
+    while (1)
+    {
+        LL_mDelay(1);
+        screen_main_update();
+    }
+    return(0);
 }
 
-#define SPD_MAX_VAL 300
-#define SPD_H 15
-#define SPD_Y 150
-#define SPD_BORDER 20
+#define SPD_TEXT_Y 84
+
+void screen_main_draw(void)
+{
+    LCD_SetTextColor(WHITE);
+    LCD_SetTextPos(0, 0);
+    LCD_SetFont(&clock_digits_32x50);
+    LCD_printf("02");
+
+    LCD_SetFont(&clock_symbols);
+    if (1%2)
+        LCD_putchar(1);
+    else
+        LCD_putchar(0);
+
+    LCD_SetFont(&clock_digits_32x50);
+    LCD_printf("36");
+
+    LCD_SetTextPos(0, SPD_TEXT_Y);
+    LCD_printf("//");
+
+    LCD_SetFont(&t_12x24_full);
+    LCD_SetTextPos(65, SPD_TEXT_Y-4);
+    LCD_printf("\xCA\xCC");
+
+    LCD_SetTextPos(71, SPD_TEXT_Y+17);
+    LCD_printf("\xD7");
+
+    LCD_Fill(64, SPD_TEXT_Y+17, 26, 2, WHITE);
+
+    LCD_SetTextPos(112+32, SPD_TEXT_Y);
+    LCD_SetFont(&clock_digits_32x50);
+    LCD_printf("///");
+
+    LCD_SetFont(&t_12x24_full);
+    LCD_SetTextPos(104, SPD_TEXT_Y+31);
+    LCD_printf("\xC2\xD2");
+
+    LCD_SetTextColor(LGRAY);
+
+    LCD_draw_line(0, 54, LCD_W-1, 54, 1);
+    LCD_draw_line(138, 0, 138, 54, 1);
+
+    LCD_draw_line(0, SPD_TEXT_Y+50+4, 69, SPD_TEXT_Y+50+4, 1);
+    LCD_draw_line(69, SPD_TEXT_Y+50+4, 69+50+5+4, SPD_TEXT_Y-5, 1);
+    LCD_draw_line(69+50+5+4, SPD_TEXT_Y-5, LCD_W-1, SPD_TEXT_Y-5, 1);
+
+    LCD_draw_line(0, 163, LCD_W-1, 163, 1);
+
+    LCD_SetTextColor(WHITE);
+
+    LCD_SetFont(&symbols_m365);
+    LCD_SetTextPos(141, 0);
+    LCD_putchar(0);
+
+    LCD_SetFont(&symbols_m365);
+    LCD_SetTextPos(141, 28);
+    LCD_putchar(1);
+
+    LCD_SetFont(&t_12x24_full);
+    LCD_SetTextPos(160, 0);
+    LCD_printf("----°C");
+    LCD_SetTextPos(160, 26);
+    LCD_printf("----°C");
+}
+
+void screen_main_update(void)
+{
+    static uint16_t cap = 0;
+    static uint16_t col = 0;
+    static uint16_t spd = 0;
+    static int16_t pow = -300;
+
+    draw_capacity(cap+=10);
+    if (cap > 8000)
+        cap = 0;
+    draw_power(pow++);
+    if (pow > 1200)
+        pow = -300;
+    draw_speed(spd++);
+    if (spd > 350)
+        spd = 0;
+
+    LCD_SetTextPos(0, SPD_TEXT_Y);
+    LCD_SetFont(&clock_digits_32x50);
+    LCD_printf("% 2u", spd/10);
+
+
+    if (pow < 0)
+    {
+        LCD_SetTextPos(112+2, SPD_TEXT_Y+22);
+        LCD_SetFont(&clock_minus_24x5);
+        LCD_putchar(1);
+
+        LCD_SetTextPos(112+32, SPD_TEXT_Y);
+        LCD_SetFont(&clock_digits_32x50);
+        LCD_printf("% 3u", -pow);
+    }
+    else if (pow < 1000)
+    {
+        LCD_SetTextPos(112+2, SPD_TEXT_Y+22);
+        LCD_SetFont(&clock_minus_24x5);
+        LCD_putchar(0);
+
+        LCD_SetTextPos(112+22, SPD_TEXT_Y);
+        LCD_SetFont(&clock_symbols);
+        LCD_putchar(0);
+
+        LCD_SetTextPos(112+32, SPD_TEXT_Y);
+        LCD_SetFont(&clock_digits_32x50);
+        LCD_printf("% 3u", pow);
+    }
+    else // pow > 1000
+    {
+        LCD_SetTextPos(112+22, SPD_TEXT_Y);
+        LCD_SetFont(&clock_symbols);
+        LCD_putchar(2);
+
+        LCD_SetTextPos(112+32, SPD_TEXT_Y);
+        LCD_SetFont(&clock_digits_32x50);
+        LCD_printf("%03u", pow-1000);
+    }
+
+}
+
+#define SPD_MAX_VAL 350
+#define SPD_H 10
+#define SPD_Y 59
+#define SPD_BORDER 4
 #define SPD_MARK_STEP 50
 
 void draw_speed(uint16_t spd)
@@ -53,7 +169,7 @@ void draw_speed(uint16_t spd)
     uint16_t mark_period = SPD_MARK_STEP * (LCD_W-SPD_BORDER*2) / SPD_MAX_VAL;
     uint8_t mark_cnt = 0;
 
-    for (uint16_t x = SPD_BORDER; x < LCD_W-SPD_BORDER; x+= mark_period)
+    for (uint16_t x = SPD_BORDER; x < LCD_W-SPD_BORDER+1; x+= mark_period)
     {
         if (mark_cnt % 2 == 0)
             LCD_Fill(x, SPD_Y+SPD_H+1, 1, 4, WHITE);
@@ -109,7 +225,7 @@ void draw_capacity(uint16_t cap)
 #define POW_MIN -300
 #define POW_MAX 1000
 #define POW_ZERO_X (-POW_MIN*LCD_W/(POW_MAX-POW_MIN))
-#define POW_Y 200
+#define POW_Y 149
 #define POW_H 10
 #define POW_STEP 50
 #define POW_STEP_LEN (LCD_W / ((POW_MAX-POW_MIN) / POW_STEP))
@@ -121,7 +237,7 @@ void draw_power(int16_t pow)
     if (pow > POW_MAX)
         pow = POW_MAX;
 
-    LCD_Fill(POW_ZERO_X, POW_Y-2, 1, POW_H+4, WHITE);
+    LCD_Fill(POW_ZERO_X, POW_Y-5, 1, 4, WHITE);//POW_H+5, WHITE);
 
     if (pow >= 0)
     {
@@ -157,7 +273,6 @@ void draw_power(int16_t pow)
         LCD_Fill(POW_ZERO_X+2, POW_Y, LCD_W-POW_ZERO_X-2, POW_H, BLACK);
     }
 }
-
 
 void Clock_Init(void)
 {

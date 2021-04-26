@@ -12,8 +12,11 @@ typedef struct
 	uint8_t offset;
 }tFont;
 
+extern const tFont clock_digits_32x50;
+extern const tFont clock_minus_24x5;
 extern const tFont clock_digits;
-extern const tFont clock_dots;
+extern const tFont clock_symbols;
+extern const tFont symbols_m365;
 extern const tFont t_12x24_full;
 extern const tFont page_markers;
 extern const tFont t_8x14_rus;
