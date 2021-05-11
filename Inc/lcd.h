@@ -21,14 +21,14 @@
 #define LCD_MAX_STRING_SIZE 100 // максимальная длина строки для printf
 #define SAVE_X_OFFSET
 
-#define LCD_BL_OFF 	    LL_GPIO_ResetOutputPin(GPIOB, LL_GPIO_PIN_1)
-#define LCD_BL_ON	 	LL_GPIO_SetOutputPin(GPIOB, LL_GPIO_PIN_1)
+//#define LCD_BL_OFF 	    LL_GPIO_ResetOutputPin(GPIOB, LL_GPIO_PIN_1)
+//#define LCD_BL_ON	 	LL_GPIO_SetOutputPin(GPIOB, LL_GPIO_PIN_1)
 #define LCD_DC_DN 		LL_GPIO_ResetOutputPin(GPIOA, LL_GPIO_PIN_6)
 #define LCD_DC_UP 		LL_GPIO_SetOutputPin(GPIOA, LL_GPIO_PIN_6)
-#define LCD_RST_DN      LL_GPIO_ResetOutputPin(GPIOB, LL_GPIO_PIN_0)
-#define LCD_RST_UP      LL_GPIO_SetOutputPin(GPIOB, LL_GPIO_PIN_0)
-#define SPI1_BSY 		(SPI1->SR & SPI_SR_BSY)
-#define SPI1_TXE 		(SPI1->SR & SPI_SR_TXE)
+#define LCD_RST_DN      LL_GPIO_ResetOutputPin(GPIOB, LL_GPIO_PIN_1)
+#define LCD_RST_UP      LL_GPIO_SetOutputPin(GPIOB, LL_GPIO_PIN_1)
+#define SPI1_BSY 		(SPI1->SR & LL_SPI_SR_BSY)
+#define SPI1_TXE 		(SPI1->SR & LL_SPI_SR_TXE)
 
 #define BLACK           0x0000      /*   0,   0,   0 */
 #define NAVY            0x000F      /*   0,   0, 128 */

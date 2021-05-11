@@ -4,6 +4,8 @@
 
 #include <math.h>
 
+void clock_init(void);
+
 void screen_main_draw(void);
 void screen_main_update(void);
 
@@ -13,9 +15,8 @@ void draw_speed(uint16_t spd);
 
 int main(void)
 {
-    Clock_Init();
+    clock_init();
     LCD_init();
-    RTC_Init();
 
     LCD_SetBGColor(BLACK);
     LCD_SetTextColor(RED);
@@ -274,77 +275,46 @@ void draw_power(int16_t pow)
     }
 }
 
-void Clock_Init(void)
+void clock_init(void)
 {
-	LL_RCC_HSI_Enable(); // На всякий случай
-	while (LL_RCC_HSI_IsReady() != 1);
-	LL_RCC_SetSysClkSource(LL_RCC_SYS_CLKSOURCE_HSI); // Стартуем от HSI
-	while (LL_RCC_GetSysClkSource() != LL_RCC_SYS_CLKSOURCE_HSI);
-	LL_RCC_SetAHBPrescaler(LL_RCC_SYSCLK_DIV_1);
+    LL_FLASH_SetLatency(LL_FLASH_LATENCY_1);
+    LL_FLASH_EnablePrefetch();
 
-	LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_AFIO);
-	LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_PWR);
+    LL_RCC_HSI_Enable();
+    while (LL_RCC_HSI_IsReady() != 1);
 
-	LL_FLASH_EnablePrefetch(); // Настраиваем флешь
-	LL_FLASH_SetLatency(LL_FLASH_LATENCY_2);
-	while (LL_FLASH_GetLatency() != LL_FLASH_LATENCY_2);
+    LL_RCC_HSI14_Enable();
+    while (LL_RCC_HSI14_IsReady() != 1);
 
-	LL_RCC_HSE_Enable(); // Теперь можно переходить на HSE+PLL
-	while (LL_RCC_HSE_IsReady() != 1);
+    LL_RCC_LSI_Enable();
+    while (LL_RCC_LSI_IsReady() != 1);
 
-	LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_HSE_DIV_1, LL_RCC_PLL_MUL_9);
-	LL_RCC_PLL_Enable();
-	while (LL_RCC_PLL_IsReady() != 1);
+    LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_HSI_DIV_2, LL_RCC_PLL_MUL_12);
+    LL_RCC_PLL_Enable();
+    while (LL_RCC_PLL_IsReady() != 1);
 
-	LL_RCC_SetAHBPrescaler(LL_RCC_SYSCLK_DIV_1);
-	LL_RCC_SetAPB1Prescaler(LL_RCC_APB1_DIV_2);
-	LL_RCC_SetAPB2Prescaler(LL_RCC_APB2_DIV_1);
+    LL_RCC_SetAHBPrescaler(LL_RCC_SYSCLK_DIV_1);
+    LL_RCC_SetAPB1Prescaler(LL_RCC_APB1_DIV_1);
+    LL_RCC_SetSysClkSource(LL_RCC_SYS_CLKSOURCE_PLL);
+    while (LL_RCC_GetSysClkSource() != LL_RCC_SYS_CLKSOURCE_STATUS_PLL);
 
-	LL_RCC_SetSysClkSource(LL_RCC_SYS_CLKSOURCE_PLL);
-	while (LL_RCC_GetSysClkSource() != LL_RCC_SYS_CLKSOURCE_STATUS_PLL);
+    LL_APB1_GRP2_EnableClock(LL_APB1_GRP2_PERIPH_SYSCFG);
+    LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_PWR);
 
-	LL_SetSystemCoreClock(72000000);
-	LL_SYSTICK_SetClkSource(LL_SYSTICK_CLKSOURCE_HCLK);
-	LL_Init1msTick(72000000);
+    LL_Init1msTick(48000000);
+    LL_SYSTICK_SetClkSource(LL_SYSTICK_CLKSOURCE_HCLK);
+    LL_SetSystemCoreClock(48000000);
 
-	NVIC_SetPriority(SysTick_IRQn,
-			NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0, 0));
+    LL_RCC_HSI14_EnableADCControl();
+    LL_RCC_SetUSARTClockSource(LL_RCC_USART1_CLKSOURCE_PCLK1);
 
-	LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_GPIOA);
-	LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_GPIOB);
-	LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_GPIOC);
-	LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_GPIOD);
+//  NVIC_SetPriority(SysTick_IRQn, 0);
+//  NVIC_EnableIRQ(SysTick_IRQn);
 
-	LL_GPIO_AF_Remap_SWJ_NOJTAG();
-}
-
-void UART_Init(void)
-{
-	LL_USART_InitTypeDef USART_InitStruct;
-	LL_GPIO_InitTypeDef GPIO_InitStruct;
-
-	LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_USART3);
-
-	GPIO_InitStruct.Pin = LL_GPIO_PIN_10;
-	GPIO_InitStruct.Mode = LL_GPIO_MODE_ALTERNATE;
-	GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_HIGH;
-	GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
-	LL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-	GPIO_InitStruct.Pin = LL_GPIO_PIN_11;
-	GPIO_InitStruct.Mode = LL_GPIO_MODE_FLOATING;
-	LL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-	USART_InitStruct.BaudRate = 115200;
-	USART_InitStruct.DataWidth = LL_USART_DATAWIDTH_8B;
-	USART_InitStruct.StopBits = LL_USART_STOPBITS_1;
-	USART_InitStruct.Parity = LL_USART_PARITY_NONE;
-	USART_InitStruct.TransferDirection = LL_USART_DIRECTION_TX_RX;
-	USART_InitStruct.HardwareFlowControl = LL_USART_HWCONTROL_NONE;
-	LL_USART_Init(USART3, &USART_InitStruct);
-
-	LL_USART_ConfigAsyncMode(USART3);
-	LL_USART_Enable(USART3);
+    // Тактирование портов
+    LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOA);
+    LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOB);
+    LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOF);
 }
 
 void _putchar(char character)

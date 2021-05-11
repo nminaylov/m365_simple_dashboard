@@ -62,7 +62,6 @@ void LCD_init(void)
     LL_mDelay(1);
     LCD_Fill(0, 0, LCD_W, LCD_H, 0x00);
     LL_mDelay(1);
-    LCD_BL_ON;
 }
 
 void LCD_Sleep(void)
@@ -76,29 +75,26 @@ void LCD_HWinit(void) // Настраиваем пины, SPI
     LL_SPI_InitTypeDef SPI_InitStruct;
     LL_GPIO_InitTypeDef GPIO_InitStruct;
 
-    LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_SPI1);
+    LL_APB1_GRP2_EnableClock(LL_APB1_GRP2_PERIPH_SPI1);
 
     LCD_DC_DN;
-    LCD_BL_OFF;
     GPIO_InitStruct.Pin = LL_GPIO_PIN_6; // DC
     GPIO_InitStruct.Mode = LL_GPIO_MODE_OUTPUT;
     GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_HIGH;
     GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
+    GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
+    GPIO_InitStruct.Alternate = LL_GPIO_AF_1;
     LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    GPIO_InitStruct.Pin = LL_GPIO_PIN_1; // RST
+    LL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
     GPIO_InitStruct.Pin = LL_GPIO_PIN_5 | LL_GPIO_PIN_7; // SCL, SDA
     GPIO_InitStruct.Mode = LL_GPIO_MODE_ALTERNATE;
-    GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_HIGH;
-    GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
+    GPIO_InitStruct.Alternate = LL_GPIO_AF_0;
     LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-    GPIO_InitStruct.Pin = LL_GPIO_PIN_0 | LL_GPIO_PIN_1; // RST, BL
-    GPIO_InitStruct.Mode = LL_GPIO_MODE_OUTPUT;
-    GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_HIGH;
-    GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
-    LL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-    SPI_InitStruct.TransferDirection = LL_SPI_HALF_DUPLEX_TX;
+    SPI_InitStruct.TransferDirection = LL_SPI_FULL_DUPLEX;
     SPI_InitStruct.Mode = LL_SPI_MODE_MASTER;
     SPI_InitStruct.DataWidth = LL_SPI_DATAWIDTH_8BIT;
     SPI_InitStruct.ClockPolarity = LL_SPI_POLARITY_HIGH;
@@ -107,9 +103,10 @@ void LCD_HWinit(void) // Настраиваем пины, SPI
     SPI_InitStruct.BaudRate = LL_SPI_BAUDRATEPRESCALER_DIV2;
     SPI_InitStruct.BitOrder = LL_SPI_MSB_FIRST;
     SPI_InitStruct.CRCCalculation = LL_SPI_CRCCALCULATION_DISABLE;
-    SPI_InitStruct.CRCPoly = 10;
+    SPI_InitStruct.CRCPoly = 7;
     LL_SPI_Init(SPI1, &SPI_InitStruct);
 
+    LL_SPI_DisableNSSPulseMgt(SPI1);
     LL_SPI_Enable(SPI1);
 }
 
@@ -117,7 +114,7 @@ void LCD_SendCMD(uint8_t val)
 {
     while (!SPI1_TXE); //wait buffer empty
     LCD_DC_DN; // A0 = 0 - CMD
-    SPI1->DR = val;
+    *(uint8_t *)&SPI1->DR = val;
     while (SPI1_BSY); //wait finish sending
 }
 
@@ -125,16 +122,17 @@ void LCD_SendData(uint8_t val)
 {
     while (!SPI1_TXE); //wait buffer empty
     LCD_DC_UP; // A0 = 1 - DATA
-    SPI1->DR = val & 0xFF;
+    *(uint8_t *)&SPI1->DR = val & 0xFF;
     while (SPI1_BSY); //wait finish sending
 }
 
 void LCD_SendPixel(uint16_t data) // Шлем 2 байта (данные)
 {
     while (!SPI1_TXE); //wait buffer empty
-    SPI1->DR = (data >> 8);
-    while (!SPI1_TXE); //wait buffer empty
-    SPI1->DR = (data & 0xFF);
+//    *(uint8_t *)&SPI1->DR = (data >> 8);
+//    while (!SPI1_TXE); //wait buffer empty
+//    *(uint8_t *)&SPI1->DR = (data & 0xFF);
+    SPI1->DR = __REV16(data);
 }
 
 // Установка окна x, y - координаты начала; w, h - ширина, высота окна
