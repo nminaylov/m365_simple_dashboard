@@ -23,5 +23,4 @@ extern const tFont t_8x14_rus;
 extern const tFont t_16x22_digits;
 extern const tFont symbols;
 
-
 #endif

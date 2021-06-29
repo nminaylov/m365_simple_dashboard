@@ -31,13 +31,17 @@ int main(void)
 }
 
 #define SPD_TEXT_Y 84
+#define COLOR_VAL       WHITE
+#define COLOR_UNITS     DGRAY
+#define COLOR_SYMBOL    GREEN
+#define COLOR_LINES     DGRAY
 
 void screen_main_draw(void)
 {
-    LCD_SetTextColor(WHITE);
+    LCD_SetTextColor(COLOR_VAL);
     LCD_SetTextPos(0, 0);
     LCD_SetFont(&clock_digits_32x50);
-    LCD_printf("02");
+    LCD_printf("00");
 
     LCD_SetFont(&clock_symbols);
     if (1%2)
@@ -46,11 +50,12 @@ void screen_main_draw(void)
         LCD_putchar(0);
 
     LCD_SetFont(&clock_digits_32x50);
-    LCD_printf("36");
+    LCD_printf("00");
 
     LCD_SetTextPos(0, SPD_TEXT_Y);
     LCD_printf("//");
 
+    LCD_SetTextColor(COLOR_UNITS);
     LCD_SetFont(&t_12x24_full);
     LCD_SetTextPos(65, SPD_TEXT_Y-4);
     LCD_printf("\xCA\xCC");
@@ -58,18 +63,19 @@ void screen_main_draw(void)
     LCD_SetTextPos(71, SPD_TEXT_Y+17);
     LCD_printf("\xD7");
 
-    LCD_Fill(64, SPD_TEXT_Y+17, 26, 2, WHITE);
+    LCD_Fill(64, SPD_TEXT_Y+17, 26, 2, COLOR_UNITS);
 
+    LCD_SetTextColor(COLOR_VAL);
     LCD_SetTextPos(112+32, SPD_TEXT_Y);
     LCD_SetFont(&clock_digits_32x50);
     LCD_printf("///");
 
+    LCD_SetTextColor(COLOR_UNITS);
     LCD_SetFont(&t_12x24_full);
     LCD_SetTextPos(104, SPD_TEXT_Y+31);
     LCD_printf("\xC2\xD2");
 
-    LCD_SetTextColor(LGRAY);
-
+    LCD_SetTextColor(COLOR_LINES);
     LCD_draw_line(0, 54, LCD_W-1, 54, 1);
     LCD_draw_line(138, 0, 138, 54, 1);
 
@@ -79,8 +85,7 @@ void screen_main_draw(void)
 
     LCD_draw_line(0, 163, LCD_W-1, 163, 1);
 
-    LCD_SetTextColor(WHITE);
-
+    LCD_SetTextColor(COLOR_SYMBOL);
     LCD_SetFont(&symbols_m365);
     LCD_SetTextPos(141, 0);
     LCD_putchar(0);
@@ -89,11 +94,31 @@ void screen_main_draw(void)
     LCD_SetTextPos(141, 28);
     LCD_putchar(1);
 
+    LCD_SetTextColor(COLOR_UNITS);
     LCD_SetFont(&t_12x24_full);
     LCD_SetTextPos(160, 0);
-    LCD_printf("----°C");
+    LCD_printf("    °C");
     LCD_SetTextPos(160, 26);
-    LCD_printf("----°C");
+    LCD_printf("    °C");
+
+    LCD_SetTextColor(COLOR_SYMBOL);
+    LCD_SetFont(&symbols_m365);
+    LCD_SetTextPos(0, 167);
+    LCD_putchar(3);
+    LCD_SetTextPos(120, 167);
+    LCD_putchar(4);
+    LCD_SetTextPos(0, 192);
+    LCD_putchar(2);
+
+    LCD_SetFont(&t_12x24_full);
+    LCD_SetTextColor(COLOR_UNITS);
+    LCD_SetTextPos(15, 167);
+    LCD_printf("      KM");
+    LCD_SetTextPos(135, 167);
+    LCD_printf("      KM");
+
+    LCD_SetTextPos(15, 192);
+    LCD_printf("   %%     mAh     B");
 }
 
 void screen_main_update(void)
@@ -114,9 +139,9 @@ void screen_main_update(void)
         spd = 0;
 
     LCD_SetTextPos(0, SPD_TEXT_Y);
+    LCD_SetTextColor(COLOR_VAL);
     LCD_SetFont(&clock_digits_32x50);
     LCD_printf("% 2u", spd/10);
-
 
     if (pow < 0)
     {
@@ -152,6 +177,25 @@ void screen_main_update(void)
         LCD_SetFont(&clock_digits_32x50);
         LCD_printf("%03u", pow-1000);
     }
+
+    LCD_SetFont(&t_12x24_full);
+    LCD_SetTextColor(COLOR_VAL);
+
+    LCD_SetTextPos(15, 167);
+    LCD_printf("123.45");
+
+    LCD_SetTextPos(135, 167);
+    LCD_printf("1234.5");
+
+
+    LCD_SetTextPos(15, 192);
+    LCD_printf("100");
+
+    LCD_SetTextPos(15+5*12, 192);
+    LCD_printf("% 4u",cap);
+
+    LCD_SetTextPos(15+5*12+8*12, 192);
+    LCD_printf("36.7");
 
 }
 
@@ -274,6 +318,7 @@ void draw_power(int16_t pow)
         LCD_Fill(POW_ZERO_X+2, POW_Y, LCD_W-POW_ZERO_X-2, POW_H, BLACK);
     }
 }
+
 
 void clock_init(void)
 {
