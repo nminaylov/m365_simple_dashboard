@@ -1,6 +1,7 @@
 #include "main.h"
 #include "printf.h"
 #include "lcd.h"
+#include "m365_uart.h"
 
 #include <math.h>
 
@@ -13,21 +14,48 @@ void draw_capacity(uint16_t cap);
 void draw_power(int16_t pow);
 void draw_speed(uint16_t spd);
 
+void screen_test_update(void);
+
+static m365_data_t * m365_data;
+
 int main(void)
 {
     clock_init();
     LCD_init();
 
+    m365_data = m365_uart_init();
+
     LCD_SetBGColor(BLACK);
     LCD_SetTextColor(RED);
-    screen_main_draw();
+    //screen_main_draw();
 
     while (1)
     {
         LL_mDelay(1);
-        screen_main_update();
+        //screen_main_update();
+        screen_test_update();
+        m365_uart_handler();
     }
     return(0);
+}
+
+void screen_test_update(void)
+{
+    LCD_SetTextPos(0, 0);
+    LCD_SetBGColor(BLACK);
+    LCD_SetTextColor(RED);
+    LCD_SetFont(&t_12x24_full);
+
+    LCD_printf("Speed: %u\n", m365_data->speed);
+    LCD_printf("Вольты: %u\n", m365_data->voltage);
+    LCD_printf("Амперы: %d\n", m365_data->current);
+    LCD_printf("Текущ: %u\n", m365_data->trip);
+    LCD_printf("Всего: %u\n", m365_data->odo);
+    LCD_printf("Silan: %u\n", m365_data->esc_temp);
+
+    LCD_printf("%%%%: %u\n", m365_data->bms_percent);
+    LCD_printf("мАч: %u\n", m365_data->bms_mah);
+    LCD_printf("Батка: %d,%d\n", m365_data->bms_temp[0]-20, m365_data->bms_temp[1]-20);
 }
 
 #define SPD_TEXT_Y 84
@@ -124,7 +152,7 @@ void screen_main_draw(void)
 void screen_main_update(void)
 {
     static uint16_t cap = 0;
-    static uint16_t col = 0;
+    //static uint16_t col = 0;
     static uint16_t spd = 0;
     static int16_t pow = -300;
 
@@ -372,6 +400,6 @@ void _putchar(char character)
 
 void HardFault_Handler(void)
 {
-	while(1);
+	//while(1);
 	NVIC_SystemReset();
 }
