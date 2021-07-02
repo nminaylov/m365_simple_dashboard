@@ -5,7 +5,7 @@
 
 typedef struct
 {
-    uint16_t speed;
+    int16_t speed;
     uint16_t voltage;
     int16_t current;
 
@@ -16,6 +16,8 @@ typedef struct
     uint16_t bms_percent;
     uint16_t bms_mah;
     uint8_t bms_temp[2];
+
+    uint8_t update_flag;
 } m365_data_t;
 
 m365_data_t * m365_uart_init(void);

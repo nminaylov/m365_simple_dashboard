@@ -31,9 +31,13 @@ int main(void)
 
     while (1)
     {
-        LL_mDelay(1);
+        //LL_mDelay(1);
         //screen_main_update();
-        screen_test_update();
+        if (m365_data->update_flag)
+        {
+            m365_data->update_flag = 0;
+            screen_test_update();
+        }
         m365_uart_handler();
     }
     return(0);
@@ -46,12 +50,12 @@ void screen_test_update(void)
     LCD_SetTextColor(RED);
     LCD_SetFont(&t_12x24_full);
 
-    LCD_printf("Speed: %u\n", m365_data->speed);
+    LCD_printf("Speed: %d\n", m365_data->speed/1000);
     LCD_printf("Âîëüòû: %u\n", m365_data->voltage);
     LCD_printf("Àìïåğû: %d\n", m365_data->current);
     LCD_printf("Òåêóù: %u\n", m365_data->trip);
     LCD_printf("Âñåãî: %u\n", m365_data->odo);
-    LCD_printf("Silan: %u\n", m365_data->esc_temp);
+    LCD_printf("Silan: %u\n", m365_data->esc_temp/10);
 
     LCD_printf("%%%%: %u\n", m365_data->bms_percent);
     LCD_printf("ìÀ÷: %u\n", m365_data->bms_mah);
