@@ -5,17 +5,17 @@
 
 typedef struct
 {
-	uint8_t sec;
-	uint8_t min;
-	uint8_t hour;
+    uint8_t sec;
+    uint8_t min;
+    uint8_t hour;
 } rtc_time_t;
 
 typedef struct
 {
-	uint8_t month;
-	uint8_t day;
-	uint8_t year;
-	uint8_t wday;
+    uint8_t month;
+    uint8_t day;
+    uint8_t year;
+    uint8_t wday;
 } rtc_date_t;
 
 

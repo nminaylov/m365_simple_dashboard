@@ -10,12 +10,12 @@ typedef struct
 	uint8_t char_h;
 	uint8_t type;
 	uint8_t offset;
-}tFont;
+} lcd_font_t;
 
-extern const tFont clock_digits_32x50;
-extern const tFont clock_minus_24x5;
-extern const tFont clock_symbols;
-extern const tFont symbols_m365;
-extern const tFont t_12x24_full;
+extern const lcd_font_t clock_digits_32x50;
+extern const lcd_font_t clock_minus_24x5;
+extern const lcd_font_t clock_symbols;
+extern const lcd_font_t symbols_m365;
+extern const lcd_font_t t_12x24_full;
 
 #endif
