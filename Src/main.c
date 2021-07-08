@@ -1,6 +1,7 @@
 #include "main.h"
 #include "printf.h"
 #include "lcd.h"
+#include "rtc_pcf2129.h"
 #include "m365_uart.h"
 
 #include <math.h>
@@ -13,6 +14,7 @@ void screen_main_update(void);
 void draw_capacity(uint16_t cap);
 void draw_power(int16_t pow);
 void draw_speed(uint16_t spd);
+void update_clock(void);
 
 void screen_test_update(void);
 
@@ -22,6 +24,7 @@ int main(void)
 {
     clock_init();
     LCD_init();
+    rtc_init();
 
     m365_data = m365_uart_init();
 
@@ -31,7 +34,7 @@ int main(void)
 
     while (1)
     {
-        //LL_mDelay(1);
+        LL_mDelay(100);
         //screen_main_update();
         if (m365_data->update_flag)
         {
@@ -39,13 +42,28 @@ int main(void)
             screen_test_update();
         }
         m365_uart_handler();
+        update_clock();
     }
     return(0);
 }
 
+void update_clock(void)
+{
+    static rtc_time_t time;
+
+    rtc_get_time(&time);
+
+    LCD_SetTextPos(0, 0);
+    LCD_SetBGColor(BLACK);
+    LCD_SetTextColor(BLUE);
+    LCD_SetFont(&t_12x24_full);
+
+    LCD_printf("%02u:%02u", time.min, time.sec);
+}
+
 void screen_test_update(void)
 {
-    LCD_SetTextPos(0, 0);
+    LCD_SetTextPos(0, 30);
     LCD_SetBGColor(BLACK);
     LCD_SetTextColor(RED);
     LCD_SetFont(&t_12x24_full);
