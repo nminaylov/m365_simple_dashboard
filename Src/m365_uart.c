@@ -30,7 +30,7 @@ typedef struct
 static m365_req_t req_std[6] =
 {
     {0x20, 0x26, 0x01, 100, 0}, // ESC - Speed
-    {0x20, 0x48, 0x02, 100, 0}, // ESC - Voltage, current
+    {0x20, 0x48, 0x09, 100, 0}, // ESC - Voltage, current
 
     {0x20, 0x29, 0x07, 1000, 0}, // ESC - Distance
     {0x20, 0xBB, 0x01, 1000, 0}, // ESC - Temperature
@@ -58,6 +58,8 @@ static uint16_t m365_uart_get_ticks_since(uint16_t ticks_last);
 
 void m365_uart_handler(void)
 {
+    static uint8_t req_cur = 0;
+
     if (cmd_rx_cnt > 0)
     {
         if (cmd_rx_cnt > (BUF_NB-1))
@@ -91,20 +93,18 @@ void m365_uart_handler(void)
         }
     }
 
-    uint8_t i = 0;
-    while (req_std[i].addr != 0xFF)
+    if (m365_uart_get_ticks_since(req_std[req_cur].tick_last) > req_std[req_cur].period)
     {
-        if (m365_uart_get_ticks_since(req_std[i].tick_last) > req_std[i].period)
+        if ((tick_rx_idle > DELAY_SINCE_RX_MIN) && (tick_rx_idle < DELAY_SINCE_RX_MAX))
         {
-            if ((tick_rx_idle > DELAY_SINCE_RX_MIN) && (tick_rx_idle < DELAY_SINCE_RX_MAX))
-            {
-                tick_rx_idle = -1;
-                m365_request_regs(req_std[i].addr, req_std[i].reg_start, req_std[i].reg_nb);
-                req_std[i].tick_last = tick_cur;
-            }
+            tick_rx_idle = -1;
+            m365_request_regs(req_std[req_cur].addr, req_std[req_cur].reg_start, req_std[req_cur].reg_nb);
+            req_std[req_cur].tick_last = tick_cur;
         }
-        i++;
     }
+    req_cur++;
+    if (req_std[req_cur].addr == 0xFF)
+        req_cur = 0;
 }
 
 static void m365_uart_handle_esc(m365_cmd_t * cmd)

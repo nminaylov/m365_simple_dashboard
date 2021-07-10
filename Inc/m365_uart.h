@@ -11,7 +11,7 @@ typedef struct
 
     uint16_t trip;
     uint32_t odo;
-    uint16_t esc_temp;
+    int16_t esc_temp;
 
     uint16_t bms_percent;
     uint16_t bms_mah;

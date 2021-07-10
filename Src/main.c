@@ -5,6 +5,7 @@
 #include "m365_uart.h"
 
 #include <math.h>
+#include <stdlib.h>
 
 void clock_init(void);
 
@@ -14,9 +15,6 @@ void screen_main_update(void);
 void draw_capacity(uint16_t cap);
 void draw_power(int16_t pow);
 void draw_speed(uint16_t spd);
-void update_clock(void);
-
-void screen_test_update(void);
 
 static m365_data_t * m365_data;
 
@@ -30,19 +28,16 @@ int main(void)
 
     LCD_set_bg_color(BLACK);
     LCD_set_text_color(RED);
-    //screen_main_draw();
+    screen_main_draw();
 
     while (1)
     {
-        //LL_mDelay(100);
-        //screen_main_update();
         if (m365_data->update_flag)
         {
             m365_data->update_flag = 0;
-            screen_test_update();
+            screen_main_update();
         }
         m365_uart_handler();
-        //update_clock();
     }
     return(0);
 }
@@ -59,25 +54,6 @@ void update_clock(void)
     LCD_set_font(&t_12x24_full);
 
     LCD_printf("%02u:%02u", time.min, time.sec);
-}
-
-void screen_test_update(void)
-{
-    LCD_set_text_pos(0, 30);
-    LCD_set_bg_color(BLACK);
-    LCD_set_text_color(RED);
-    LCD_set_font(&t_12x24_full);
-
-    LCD_printf("Speed: %d\n", m365_data->speed/1000);
-    LCD_printf("Вольты: %u\n", m365_data->voltage);
-    LCD_printf("Амперы: %d\n", m365_data->current);
-    LCD_printf("Текущ: %u\n", m365_data->trip);
-    LCD_printf("Всего: %u\n", m365_data->odo);
-    LCD_printf("Silan: %u\n", m365_data->esc_temp/10);
-
-    LCD_printf("%%%%: %u\n", m365_data->bms_percent);
-    LCD_printf("мАч: %u\n", m365_data->bms_mah);
-    LCD_printf("Батка: %d,%d\n", m365_data->bms_temp[0]-20, m365_data->bms_temp[1]-20);
 }
 
 #define SPD_TEXT_Y 84
@@ -173,25 +149,20 @@ void screen_main_draw(void)
 
 void screen_main_update(void)
 {
-    static uint16_t cap = 0;
-    //static uint16_t col = 0;
-    static uint16_t spd = 0;
-    static int16_t pow = -300;
+    int32_t pow = (m365_data->voltage * m365_data->current) / 10000;
 
-    draw_capacity(cap+=10);
-    if (cap > 8000)
-        cap = 0;
-    draw_power(pow++);
-    if (pow > 1200)
-        pow = -300;
-    draw_speed(spd++);
-    if (spd > 350)
+    int32_t spd = m365_data->speed;
+    if (spd < 0)
         spd = 0;
+
+    draw_capacity(m365_data->bms_mah);
+    draw_power(pow);
+    draw_speed(spd/100);
 
     LCD_set_text_pos(0, SPD_TEXT_Y);
     LCD_set_text_color(COLOR_VAL);
     LCD_set_font(&clock_digits_32x50);
-    LCD_printf("% 2u", spd/10);
+    LCD_printf("% 2u", spd/1000);
 
     if (pow < 0)
     {
@@ -232,21 +203,26 @@ void screen_main_update(void)
     LCD_set_text_color(COLOR_VAL);
 
     LCD_set_text_pos(15, 167);
-    LCD_printf("123.45");
+    LCD_printf("% 2u.%03u", m365_data->trip/1000, m365_data->trip%1000);
 
     LCD_set_text_pos(135, 167);
-    LCD_printf("1234.5");
-
+    LCD_printf("% 4u.%1u", m365_data->odo/1000, m365_data->odo/100%10);
 
     LCD_set_text_pos(15, 192);
-    LCD_printf("100");
+    LCD_printf("% 3u", m365_data->bms_percent);
 
     LCD_set_text_pos(15+5*12, 192);
-    LCD_printf("% 4u",cap);
+    LCD_printf("% 4u", m365_data->bms_mah);
 
     LCD_set_text_pos(15+5*12+8*12, 192);
-    LCD_printf("36.7");
+    LCD_printf("%2u.%1u", m365_data->voltage/100, m365_data->voltage/10%10);
 
+    LCD_set_text_pos(165, 0);
+    LCD_printf("% 2d", m365_data->esc_temp/10);
+
+    int16_t bat_t = ((m365_data->bms_temp[0]-20) + (m365_data->bms_temp[1]-20))/2;
+    LCD_set_text_pos(165, 26);
+    LCD_printf("% 2d", bat_t);
 }
 
 #define SPD_MAX_VAL 350
