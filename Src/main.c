@@ -22,7 +22,7 @@ int main(void)
 {
     clock_init();
     LCD_init();
-    //rtc_init();
+    rtc_init();
 
     m365_data = m365_uart_init();
 
@@ -42,20 +42,6 @@ int main(void)
     return(0);
 }
 
-void update_clock(void)
-{
-    static rtc_time_t time;
-
-    rtc_get_time(&time);
-
-    LCD_set_text_pos(0, 0);
-    LCD_set_bg_color(BLACK);
-    LCD_set_text_color(BLUE);
-    LCD_set_font(&t_12x24_full);
-
-    LCD_printf("%02u:%02u", time.min, time.sec);
-}
-
 #define SPD_TEXT_Y 84
 #define COLOR_VAL       WHITE
 #define COLOR_UNITS     DGRAY
@@ -65,19 +51,7 @@ void update_clock(void)
 void screen_main_draw(void)
 {
     LCD_set_text_color(COLOR_VAL);
-    LCD_set_text_pos(0, 0);
     LCD_set_font(&clock_digits_32x50);
-    LCD_printf("00");
-
-    LCD_set_font(&clock_symbols);
-    if (1%2)
-        LCD_putchar(1);
-    else
-        LCD_putchar(0);
-
-    LCD_set_font(&clock_digits_32x50);
-    LCD_printf("00");
-
     LCD_set_text_pos(0, SPD_TEXT_Y);
     LCD_printf("//");
 
@@ -149,6 +123,22 @@ void screen_main_draw(void)
 
 void screen_main_update(void)
 {
+    static rtc_time_t time;
+    rtc_get_time(&time);
+
+    LCD_set_text_color(COLOR_VAL);
+    LCD_set_text_pos(0, 0);
+
+    LCD_set_font(&clock_digits_32x50);
+    LCD_printf("%02u", time.hour);
+    LCD_set_font(&clock_symbols);
+    if (time.sec%2)
+        LCD_putchar(1);
+    else
+        LCD_putchar(0);
+    LCD_set_font(&clock_digits_32x50);
+    LCD_printf("%02u", time.min);
+
     int32_t pow = (m365_data->voltage * m365_data->current) / 10000;
 
     int32_t spd = m365_data->speed;

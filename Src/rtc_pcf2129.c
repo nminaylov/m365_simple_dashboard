@@ -46,7 +46,7 @@ uint8_t rtc_init(void)
     rtc_date_t date_temp;
     rtc_i2c_init();
     uint8_t temp_reg = 0;
-    LL_mDelay(100);
+    LL_mDelay(1000);
     uint8_t state = rtc_read_reg(PCF2129_ADDRESS,PCF2129_CONTROL_1,&temp_reg);
     if (temp_reg != 0x00)
     {
