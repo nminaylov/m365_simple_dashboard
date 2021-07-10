@@ -24,7 +24,7 @@ int main(void)
 {
     clock_init();
     LCD_init();
-    rtc_init();
+    //rtc_init();
 
     m365_data = m365_uart_init();
 
@@ -34,7 +34,7 @@ int main(void)
 
     while (1)
     {
-        LL_mDelay(100);
+        //LL_mDelay(100);
         //screen_main_update();
         if (m365_data->update_flag)
         {
@@ -42,7 +42,7 @@ int main(void)
             screen_test_update();
         }
         m365_uart_handler();
-        update_clock();
+        //update_clock();
     }
     return(0);
 }

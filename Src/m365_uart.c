@@ -5,6 +5,8 @@ static m365_data_t m365_data;
 
 #define DATA_LEN_MAX 250
 #define BUF_NB 5
+#define DELAY_SINCE_RX_MIN 2
+#define DELAY_SINCE_RX_MAX 7
 
 typedef struct
 {
@@ -16,6 +18,30 @@ typedef struct
     uint16_t csum;
 } m365_cmd_t;
 
+typedef struct
+{
+    uint8_t addr;
+    uint8_t reg_start;
+    uint8_t reg_nb;
+    uint16_t period;
+    uint16_t tick_last;
+} m365_req_t;
+
+static m365_req_t req_std[6] =
+{
+    {0x20, 0x26, 0x01, 100, 0}, // ESC - Speed
+    {0x20, 0x48, 0x02, 100, 0}, // ESC - Voltage, current
+
+    {0x20, 0x29, 0x07, 1000, 0}, // ESC - Distance
+    {0x20, 0xBB, 0x01, 1000, 0}, // ESC - Temperature
+
+    {0x22, 0x31, 0x05, 1000, 0}, // BMS
+
+    {0xFF, 0x00, 0x00,   0, 0},
+};
+
+static uint16_t tick_cur = 0;
+static int16_t  tick_rx_idle = -1;
 
 static uint8_t m365_cmd_tx_buf[64];
 static m365_cmd_t cmd[BUF_NB];
@@ -23,13 +49,12 @@ static uint8_t cmd_rx_last = 0;
 static uint8_t cmd_rx_cnt = 0;
 static uint8_t data_len = 0;
 
-static uint16_t bytes_skip = 0;
-static uint8_t update_flag = 0;
+static uint16_t rx_bytes_skip = 0;
 
 static void m365_uart_handle_esc(m365_cmd_t * cmd);
 static void m365_uart_handle_bms(m365_cmd_t * cmd);
 static void m365_request_regs(uint8_t addr, uint8_t start, uint8_t nb);
-static void m365_uart_tx(uint8_t * data, uint16_t len);
+static uint16_t m365_uart_get_ticks_since(uint16_t ticks_last);
 
 void m365_uart_handler(void)
 {
@@ -66,10 +91,19 @@ void m365_uart_handler(void)
         }
     }
 
-    if (update_flag == 1)
+    uint8_t i = 0;
+    while (req_std[i].addr != 0xFF)
     {
-        update_flag = 0;
-        m365_request_regs(0x20, 0x48, 1);
+        if (m365_uart_get_ticks_since(req_std[i].tick_last) > req_std[i].period)
+        {
+            if ((tick_rx_idle > DELAY_SINCE_RX_MIN) && (tick_rx_idle < DELAY_SINCE_RX_MAX))
+            {
+                tick_rx_idle = -1;
+                m365_request_regs(req_std[i].addr, req_std[i].reg_start, req_std[i].reg_nb);
+                req_std[i].tick_last = tick_cur;
+            }
+        }
+        i++;
     }
 }
 
@@ -160,29 +194,23 @@ static void m365_request_regs(uint8_t addr, uint8_t start, uint8_t nb)
     m365_cmd_tx_buf[m365_cmd_tx_buf[2]+4] = csum_temp & 0xFF;
     m365_cmd_tx_buf[m365_cmd_tx_buf[2]+5] = (csum_temp >> 8) & 0xFF;
 
-    m365_uart_tx(m365_cmd_tx_buf, m365_cmd_tx_buf[2]+6);
-}
+    rx_bytes_skip = m365_cmd_tx_buf[2]+6; // „тобы не обрабатывать свои же данные
 
-static void m365_uart_tx(uint8_t * data, uint16_t len)
-{
-    bytes_skip = len;
-    for (uint16_t i = 0; i < len; i++)
-    {
-        while (!LL_USART_IsActiveFlag_TXE(USART1));
-        LL_USART_TransmitData8(USART1, data[i]);
-    }
-
+    LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_2, m365_cmd_tx_buf[2]+6);
+    LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_2);
 }
 
 m365_data_t * m365_uart_init(void)
 {
     LL_USART_InitTypeDef USART_InitStruct;
     LL_GPIO_InitTypeDef GPIO_InitStruct;
+    LL_DMA_InitTypeDef DMA_InitStruct;
     LL_TIM_InitTypeDef TIM_InitStruct;
 
     LL_APB1_GRP2_EnableClock(LL_APB1_GRP2_PERIPH_USART1);
+    LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_DMA1);
 
-    GPIO_InitStruct.Pin = LL_GPIO_PIN_2; // TX
+    GPIO_InitStruct.Pin = LL_GPIO_PIN_2;// | LL_GPIO_PIN_3; // TX RX
     GPIO_InitStruct.Mode = LL_GPIO_MODE_ALTERNATE;
     GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_HIGH;
     GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_OPENDRAIN;
@@ -203,22 +231,41 @@ m365_data_t * m365_uart_init(void)
     LL_USART_ConfigHalfDuplexMode(USART1);
 
     LL_USART_EnableIT_RXNE(USART1);
+    LL_USART_EnableDMAReq_TX(USART1);
 
-    NVIC_SetPriority(USART1_IRQn, 1);
+    NVIC_SetPriority(USART1_IRQn, 0);
     NVIC_EnableIRQ(USART1_IRQn);
 
     LL_USART_Enable(USART1);
+
+    // DMA
+    LL_DMA_DeInit(DMA1, LL_DMA_CHANNEL_2); // Tx
+    DMA_InitStruct.PeriphOrM2MSrcAddress = LL_USART_DMA_GetRegAddr(USART1,LL_USART_DMA_REG_DATA_TRANSMIT);
+    DMA_InitStruct.MemoryOrM2MDstAddress = (uint32_t)m365_cmd_tx_buf;
+    DMA_InitStruct.Direction = LL_DMA_DIRECTION_MEMORY_TO_PERIPH;
+    DMA_InitStruct.NbData = 0;
+    DMA_InitStruct.PeriphOrM2MSrcIncMode = LL_DMA_PERIPH_NOINCREMENT;
+    DMA_InitStruct.MemoryOrM2MDstIncMode = LL_DMA_MEMORY_INCREMENT;
+    DMA_InitStruct.PeriphOrM2MSrcDataSize = LL_DMA_PDATAALIGN_BYTE;
+    DMA_InitStruct.MemoryOrM2MDstDataSize = LL_DMA_PDATAALIGN_HALFWORD;
+    DMA_InitStruct.Mode = LL_DMA_MODE_NORMAL;
+    DMA_InitStruct.Priority = LL_DMA_PRIORITY_VERYHIGH;
+    LL_DMA_Init(DMA1, LL_DMA_CHANNEL_2, &DMA_InitStruct);
+
+    LL_DMA_EnableIT_TC(DMA1, LL_DMA_CHANNEL_2);
+
+    NVIC_SetPriority(DMA1_Channel2_3_IRQn, 1);
+    NVIC_EnableIRQ(DMA1_Channel2_3_IRQn);
 
 
     LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_TIM14);
 
     TIM_InitStruct.Prescaler = 48-1; // 48 000 000/48/1000 = 1000
     TIM_InitStruct.CounterMode = LL_TIM_COUNTERMODE_UP;
-    TIM_InitStruct.Autoreload = 5000;
+    TIM_InitStruct.Autoreload = 1000;
     TIM_InitStruct.ClockDivision = LL_TIM_CLOCKDIVISION_DIV1;
     TIM_InitStruct.RepetitionCounter = 0;
     LL_TIM_Init(TIM14, &TIM_InitStruct);
-    LL_TIM_SetOnePulseMode(TIM14, LL_TIM_ONEPULSEMODE_SINGLE);
 
     LL_TIM_ClearFlag_UPDATE(TIM14);
     LL_TIM_EnableIT_UPDATE(TIM14);
@@ -236,6 +283,8 @@ void USART1_IRQHandler(void)
     static uint8_t state = 0;
     static uint8_t buf_nb = 0;
 
+    tick_rx_idle = -1;
+
     if (LL_USART_IsActiveFlag_ORE(USART1))
     {
         LL_USART_ClearFlag_ORE(USART1);
@@ -243,12 +292,11 @@ void USART1_IRQHandler(void)
 
     if (LL_USART_IsActiveFlag_RXNE(USART1))
     {
-        LL_TIM_SetCounter(TIM14, 0);
         uint16_t rx_data = LL_USART_ReceiveData8(USART1);
 
-        if (bytes_skip > 0)
+        if (rx_bytes_skip > 0)
         {
-            bytes_skip--;
+            rx_bytes_skip--;
         }
         else
         {
@@ -295,23 +343,42 @@ void USART1_IRQHandler(void)
                 break;
             case 8: //csum - 2
                 cmd[buf_nb].csum |= rx_data << 8;
+                if (((cmd[buf_nb].addr == 0x20) && (cmd[buf_nb].cmd == 0x65)) ||
+                    ((cmd[buf_nb].addr == 0x21) && (cmd[buf_nb].cmd == 0x64)))
+                    tick_rx_idle = 0;
                 cmd_rx_cnt++;
                 cmd_rx_last = buf_nb;
                 buf_nb++;
                 if (buf_nb >= BUF_NB)
                     buf_nb = 0;
                 state = 0;
-                LL_TIM_EnableCounter(TIM14);
                 break;
             }
         }
     }
 }
 
+void DMA1_Channel2_3_IRQHandler(void)
+{
+    if (LL_DMA_IsActiveFlag_TC2(DMA1)) // Tx end
+    {
+        LL_DMA_ClearFlag_TC2(DMA1);
+        LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_2);
+    }
+}
+
 void TIM14_IRQHandler(void)
 {
     LL_TIM_ClearFlag_UPDATE(TIM14);
-    if (LL_USART_IsActiveFlag_IDLE(USART1))
-        update_flag = 1;
+    tick_cur++;
+    if (tick_rx_idle >= 0)
+        tick_rx_idle++;
 }
 
+static uint16_t m365_uart_get_ticks_since(uint16_t ticks_last)
+{
+    int16_t t = tick_cur - ticks_last;
+    if (t < 0)
+        t += 0xFFFF;
+    return t;
+}
