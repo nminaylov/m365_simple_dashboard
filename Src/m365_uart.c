@@ -27,7 +27,7 @@ typedef struct
     uint16_t tick_last;
 } m365_req_t;
 
-static m365_req_t req_std[6] =
+static m365_req_t req_list_run[6] =
 {
     {0x20, 0x26, 0x01, 100, 0}, // ESC - Speed
     {0x20, 0x48, 0x09, 100, 0}, // ESC - Voltage, current
@@ -35,10 +35,20 @@ static m365_req_t req_std[6] =
     {0x20, 0x29, 0x07, 1000, 0}, // ESC - Distance
     {0x20, 0xBB, 0x01, 1000, 0}, // ESC - Temperature
 
-    {0x22, 0x31, 0x05, 1000, 0}, // BMS
+    {0x22, 0x30, 0x06, 1000, 0}, // BMS
 
-    {0xFF, 0x00, 0x00,   0, 0},
+    {0xFF, 0x00, 0x00,    0, 0},
 };
+
+static m365_req_t req_list_charge[2] =
+{
+    {0x22, 0x30, 0x20, 1000, 0}, // BMS
+
+    {0xFF, 0x00, 0x00,    0, 0},
+};
+
+static uint8_t req_cur_nb = 0;
+static m365_req_t * req_list_cur = NULL;
 
 static uint16_t tick_cur = 0;
 static int16_t  tick_rx_idle = -1;
@@ -53,13 +63,12 @@ static uint16_t rx_bytes_skip = 0;
 
 static void m365_uart_handle_esc(m365_cmd_t * cmd);
 static void m365_uart_handle_bms(m365_cmd_t * cmd);
+static void m365_uart_handle_inputs(m365_cmd_t * cmd);
 static void m365_request_regs(uint8_t addr, uint8_t start, uint8_t nb);
 static uint16_t m365_uart_get_ticks_since(uint16_t ticks_last);
 
 void m365_uart_handler(void)
 {
-    static uint8_t req_cur = 0;
-
     if (cmd_rx_cnt > 0)
     {
         if (cmd_rx_cnt > (BUF_NB-1))
@@ -80,6 +89,9 @@ void m365_uart_handler(void)
         {
             switch (cmd[cmd_rx].addr)
             {
+            case 0x20:
+                m365_uart_handle_inputs(&cmd[cmd_rx]);
+                break;
             case 0x23:
                 m365_uart_handle_esc(&cmd[cmd_rx]);
                 break;
@@ -93,18 +105,38 @@ void m365_uart_handler(void)
         }
     }
 
-    if (m365_uart_get_ticks_since(req_std[req_cur].tick_last) > req_std[req_cur].period)
+    if (req_list_cur != NULL)
     {
-        if ((tick_rx_idle > DELAY_SINCE_RX_MIN) && (tick_rx_idle < DELAY_SINCE_RX_MAX))
-        {
-            tick_rx_idle = -1;
-            m365_request_regs(req_std[req_cur].addr, req_std[req_cur].reg_start, req_std[req_cur].reg_nb);
-            req_std[req_cur].tick_last = tick_cur;
-        }
+    	if (m365_uart_get_ticks_since(req_list_cur[req_cur_nb].tick_last) > req_list_cur[req_cur_nb].period)
+		{
+			if ((tick_rx_idle > DELAY_SINCE_RX_MIN) && (tick_rx_idle < DELAY_SINCE_RX_MAX))
+			{
+				tick_rx_idle = -1;
+				m365_request_regs(req_list_cur[req_cur_nb].addr, req_list_cur[req_cur_nb].reg_start, req_list_cur[req_cur_nb].reg_nb);
+				req_list_cur[req_cur_nb].tick_last = tick_cur;
+			}
+		}
+		req_cur_nb++;
+		if (req_list_cur[req_cur_nb].addr == 0xFF)
+			req_cur_nb = 0;
     }
-    req_cur++;
-    if (req_std[req_cur].addr == 0xFF)
-        req_cur = 0;
+}
+
+void m365_uart_set_req_mode(uint8_t req_mode)
+{
+	switch (req_mode)
+	{
+	case 0:
+		req_list_cur = NULL;
+		break;
+	case 1:
+		req_list_cur = req_list_run;
+		break;
+	case 2:
+		req_list_cur = req_list_charge;
+		break;
+	}
+	req_cur_nb = 0;
 }
 
 static void m365_uart_handle_esc(m365_cmd_t * cmd)
@@ -154,6 +186,10 @@ static void m365_uart_handle_bms(m365_cmd_t * cmd)
         {
             switch (cmd->arg + reg)
             {
+            case 0x30:
+                memcpy(&m365_data.bms_flags, &cmd->data[reg*2], 2);
+                m365_data.update_flag = 1;
+                break;
             case 0x31:
                 memcpy(&m365_data.bms_mah, &cmd->data[reg*2], 2);
                 m365_data.update_flag = 1;
@@ -162,14 +198,48 @@ static void m365_uart_handle_bms(m365_cmd_t * cmd)
                 memcpy(&m365_data.bms_percent, &cmd->data[reg*2], 2);
                 m365_data.update_flag = 1;
                 break;
+            case 0x33:
+                memcpy(&m365_data.bms_current, &cmd->data[reg*2], 2);
+                m365_data.update_flag = 1;
+                break;
+            case 0x34:
+                memcpy(&m365_data.bms_voltage, &cmd->data[reg*2], 2);
+                m365_data.update_flag = 1;
+                break;
             case 0x35:
                 memcpy(m365_data.bms_temp, &cmd->data[reg*2], 2);
                 m365_data.update_flag = 1;
                 break;
+            case 0x36:
+                memcpy(&m365_data.bms_balance_flags, &cmd->data[reg*2], 2);
+                m365_data.update_flag = 1;
+                break;
+            case 0x40:
+            case 0x41:
+            case 0x42:
+            case 0x43:
+            case 0x44:
+            case 0x45:
+            case 0x46:
+            case 0x47:
+            case 0x48:
+            case 0x49:
+            	memcpy(&m365_data.bms_cell_voltage[cmd->arg+reg-0x40], &cmd->data[reg*2], 2);
+            	m365_data.update_flag = 1;
+            	break;
             default:
                 break;
             }
         }
+    }
+}
+
+static void m365_uart_handle_inputs(m365_cmd_t * cmd)
+{
+    if (cmd->cmd == 0x65) // Update head inputs
+    {
+    	m365_data.trottle_pos = cmd->data[1];
+    	m365_data.brake_pos = cmd->data[2];
     }
 }
 

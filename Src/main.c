@@ -25,6 +25,7 @@ int main(void)
     rtc_init();
 
     m365_data = m365_uart_init();
+    m365_uart_set_req_mode(1);
 
     LCD_set_bg_color(BLACK);
     LCD_set_text_color(RED);
