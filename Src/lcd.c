@@ -61,12 +61,9 @@ void LCD_init(void)
     LL_mDelay(1);
 
     LCD_send_cmd(0x36);
-#ifdef LCD_TURN
     LCD_send_data(0xC0);
-#else
-    LCD_send_data(0x00);
-#endif
     LL_mDelay(1);
+
     LCD_fill(0, 0, LCD_W, LCD_H, 0x00);
     LL_mDelay(1);
 }
@@ -153,9 +150,10 @@ static void LCD_set_window(uint16_t x, uint16_t y, uint16_t w, uint16_t h)
     LCD_send_data(x + w - 1);
     LCD_send_cmd(0x2B); // RASET
 
-    LCD_send_data(0);
+    y_t += 80;
+    LCD_send_data(y_t >> 8);
     LCD_send_data(y_t & 0xFF);
-    LCD_send_data(0);
+    LCD_send_data((y_t+h-1) >> 8);
     LCD_send_data((y_t+h-1) & 0xFF);
 
     LCD_send_cmd(0x2C); // RAMWR
