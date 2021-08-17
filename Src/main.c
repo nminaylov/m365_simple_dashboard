@@ -12,6 +12,11 @@ void clock_init(void);
 void screen_main_draw(void);
 void screen_main_update(void);
 
+void screen_charge_draw(void);
+void screen_charge_update(void);
+
+void screen_locked_draw(void);
+
 void draw_capacity(uint16_t cap);
 void draw_power(int16_t pow);
 void draw_speed(uint16_t spd);
@@ -20,15 +25,16 @@ static m365_data_t * m365_data;
 
 int main(void)
 {
+    uint32_t lock_timeout = 0;
+    uint8_t screen_cur = 0;
     clock_init();
     LCD_init();
     rtc_init();
 
     m365_data = m365_uart_init();
-    m365_uart_set_req_mode(1);
 
-    LCD_set_bg_color(BLACK);
-    LCD_set_text_color(RED);
+    screen_cur = 0;
+    m365_uart_set_req_mode(1);
     screen_main_draw();
 
     while (1)
@@ -36,9 +42,41 @@ int main(void)
         if (m365_data->update_flag)
         {
             m365_data->update_flag = 0;
-            screen_main_update();
+            if (screen_cur == 0)
+                screen_main_update();
+            else if (screen_cur == 1)
+                screen_charge_update();
         }
         m365_uart_handler();
+
+        if ((m365_data->trottle_pos > 0x60) && (m365_data->brake_pos > 0x60))
+        {
+            lock_timeout++;
+            if ((lock_timeout > 1000000) && (screen_cur != 2))
+            {
+                screen_cur = 2;
+                m365_uart_set_req_mode(0);
+                screen_locked_draw();
+            }
+        }
+        else
+        {
+            lock_timeout = 0;
+        }
+
+        if ((m365_data->bms_flags & (1 << 6)) && (screen_cur == 0)) // Charge flag
+        {
+            screen_cur = 1;
+            m365_uart_set_req_mode(2);
+            screen_charge_draw();
+        }
+        else if (!(m365_data->bms_flags & (1 << 6)) && (screen_cur == 1))
+        {
+            screen_cur = 0;
+            m365_uart_set_req_mode(1);
+            screen_main_draw();
+        }
+
     }
     return(0);
 }
@@ -51,6 +89,10 @@ int main(void)
 
 void screen_main_draw(void)
 {
+    LCD_fill(0, 0, LCD_W, LCD_H, BLACK);
+
+    LCD_set_bg_color(BLACK);
+
     LCD_set_text_color(COLOR_VAL);
     LCD_set_font(&clock_digits_32x50);
     LCD_set_text_pos(0, SPD_TEXT_Y);
@@ -194,7 +236,7 @@ void screen_main_update(void)
     LCD_set_text_color(COLOR_VAL);
 
     LCD_set_text_pos(15, 167);
-    LCD_printf("% 2u.%03u", m365_data->trip/1000, m365_data->trip%1000);
+    LCD_printf("% 2u.%02u0", m365_data->trip/100, m365_data->trip%100);
 
     LCD_set_text_pos(135, 167);
     LCD_printf("% 4u.%1u", m365_data->odo/1000, m365_data->odo/100%10);
@@ -214,6 +256,99 @@ void screen_main_update(void)
     int16_t bat_t = ((m365_data->bms_temp[0]-20) + (m365_data->bms_temp[1]-20))/2;
     LCD_set_text_pos(165, 26);
     LCD_printf("% 2d", bat_t);
+}
+
+void screen_charge_draw(void)
+{
+    LCD_fill(0, 0, LCD_W, LCD_H, BLACK);
+
+    LCD_set_text_color(COLOR_LINES);
+
+    LCD_draw_line(0, 27, LCD_W-1, 27, 1);
+    LCD_draw_line(0, 164, LCD_W-1, 164, 1);
+
+    LCD_set_font(&t_12x24_full);
+
+    for (uint8_t i = 0; i < 5; i++)
+    {
+        LCD_set_text_pos(0, 44+i*20);
+        LCD_set_text_color(COLOR_SYMBOL);
+        LCD_printf("% 2u:", i+1);
+        LCD_set_text_color(COLOR_UNITS);
+        LCD_printf("     B");
+    }
+    for (uint8_t i = 5; i < 10; i++)
+    {
+        LCD_set_text_pos(120, 44+(i-5)*20);
+        LCD_set_text_color(COLOR_SYMBOL);
+        LCD_printf("% 2u:", i+1);
+        LCD_set_text_color(COLOR_UNITS);
+        LCD_printf("     B");
+    }
+
+    LCD_set_text_color(COLOR_UNITS);
+
+    LCD_set_text_pos(0, 2);
+    LCD_printf("      B       A");
+
+    LCD_set_text_pos(0, 167);
+    LCD_printf("    /   °C");
+
+    LCD_set_text_pos(0, 192);
+    LCD_printf("    %%      mAh");
+}
+
+void screen_charge_update(void)
+{
+    draw_capacity(m365_data->bms_mah);
+
+    LCD_set_text_color(COLOR_VAL);
+    for (uint8_t i = 0; i < 5; i++)
+    {
+        if (m365_data->bms_balance_flags & (1 << i))
+            LCD_set_text_color(RED);
+        else
+            LCD_set_text_color(WHITE);
+        LCD_set_text_pos(0+36, 44+i*20);
+        LCD_printf("%1u.%03u", m365_data->bms_cell_voltage[i]/1000, m365_data->bms_cell_voltage[i]%1000);
+    }
+    for (uint8_t i = 5; i < 10; i++)
+    {
+        if (m365_data->bms_balance_flags & (1 << i))
+            LCD_set_text_color(RED);
+        else
+            LCD_set_text_color(WHITE);
+        LCD_set_text_pos(120+36, 44+(i-5)*20);
+        LCD_printf("%1u.%03u", m365_data->bms_cell_voltage[i]/1000, m365_data->bms_cell_voltage[i]%1000);
+    }
+
+    LCD_set_text_color(COLOR_VAL);
+
+    LCD_set_text_pos(12, 2);
+    LCD_printf("% 2u.%02u", m365_data->bms_voltage/100, m365_data->bms_voltage%100);
+
+    uint16_t cur_temp = abs(m365_data->bms_current);
+    LCD_set_text_pos(108, 2);
+    LCD_printf("% 2u.%02u", cur_temp/100, cur_temp%100);
+
+    LCD_set_text_pos(12, 167);
+    LCD_printf("% 2d", m365_data->bms_temp[0]-20);
+    LCD_set_text_pos(60, 167);
+    LCD_printf("% 2d", m365_data->bms_temp[1]-20);
+
+    LCD_set_text_pos(12, 192);
+    LCD_printf("% 3u", m365_data->bms_percent);
+    LCD_set_text_pos(84, 192);
+    LCD_printf("% 4u", m365_data->bms_mah);
+}
+
+void screen_locked_draw(void)
+{
+    LCD_fill(0, 0, LCD_W, LCD_H, BLACK);
+    LCD_set_bg_color(BLACK);
+    LCD_set_text_color(RED);
+    LCD_draw_line(40, 40, 200, 200, 5);
+    LCD_draw_line(40, 200, 200, 40, 5);
 }
 
 #define SPD_MAX_VAL 350
