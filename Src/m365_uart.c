@@ -327,7 +327,7 @@ m365_data_t * m365_uart_init(void)
     NVIC_SetPriority(DMA1_Channel2_3_IRQn, 1);
     NVIC_EnableIRQ(DMA1_Channel2_3_IRQn);
 
-
+    // Tick timer
     LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_TIM14);
 
     TIM_InitStruct.Prescaler = 48-1; // 48 000 000/48/1000 = 1000
@@ -382,36 +382,36 @@ void USART1_IRQHandler(void)
                 else
                     state = 0;
                 break;
-            case 2: //len
+            case 2: // len
                 cmd[buf_nb].len = rx_data;
                 if (cmd[buf_nb].len < (DATA_LEN_MAX+2))
                     state = 3;
                 else
                     state = 0;
                 break;
-            case 3: //addr
+            case 3: // addr
                 cmd[buf_nb].addr = rx_data;
                 state = 4;
                 break;
-            case 4: //cmd
+            case 4: // cmd
                 cmd[buf_nb].cmd = rx_data;
                 state = 5;
                 break;
-            case 5: //arg
+            case 5: // arg
                 cmd[buf_nb].arg = rx_data;
                 state = 6;
                 data_len = 0;
                 break;
-            case 6: //data
+            case 6: // data
                 cmd[buf_nb].data[data_len++] = rx_data;
                 if (data_len >= cmd[buf_nb].len-2)
                     state = 7;
                 break;
-            case 7: //csum - 1
+            case 7: // csum - 1
                 cmd[buf_nb].csum = rx_data;
                 state = 8;
                 break;
-            case 8: //csum - 2
+            case 8: // csum - 2
                 cmd[buf_nb].csum |= rx_data << 8;
                 if (((cmd[buf_nb].addr == 0x20) && (cmd[buf_nb].cmd == 0x65)) ||
                     ((cmd[buf_nb].addr == 0x21) && (cmd[buf_nb].cmd == 0x64)))

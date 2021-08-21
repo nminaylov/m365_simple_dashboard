@@ -66,9 +66,12 @@ int main(void)
 
         if ((m365_data->bms_flags & (1 << 6)) && (screen_cur == 0)) // Charge flag
         {
-            screen_cur = 1;
-            m365_uart_set_req_mode(2);
-            screen_charge_draw();
+            if (m365_data->speed == 0)
+            {
+                screen_cur = 1;
+                m365_uart_set_req_mode(2);
+                screen_charge_draw();
+            }
         }
         else if (!(m365_data->bms_flags & (1 << 6)) && (screen_cur == 1))
         {
@@ -78,7 +81,7 @@ int main(void)
         }
 
     }
-    return(0);
+    return (0);
 }
 
 #define SPD_TEXT_Y 84
@@ -156,7 +159,7 @@ void screen_main_draw(void)
     LCD_set_font(&t_12x24_full);
     LCD_set_text_color(COLOR_UNITS);
     LCD_set_text_pos(15, 167);
-    LCD_printf("      KM");
+    LCD_printf("     KM");
     LCD_set_text_pos(135, 167);
     LCD_printf("      KM");
 
@@ -236,7 +239,7 @@ void screen_main_update(void)
     LCD_set_text_color(COLOR_VAL);
 
     LCD_set_text_pos(15, 167);
-    LCD_printf("% 2u.%02u0", m365_data->trip/100, m365_data->trip%100);
+    LCD_printf("% 2u.%02u", m365_data->trip/100, m365_data->trip%100);
 
     LCD_set_text_pos(135, 167);
     LCD_printf("% 4u.%1u", m365_data->odo/1000, m365_data->odo/100%10);
